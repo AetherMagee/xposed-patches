@@ -58,16 +58,21 @@ final class AccountInfo {
         try {
             JSONObject o = new JSONObject(json);
             return new AccountInfo(
-                    o.optString("l", null),
-                    o.optString("d", null),
+                    optString(o, "l"),
+                    optString(o, "d"),
                     o.has("a") ? o.getBoolean("a") : null,
-                    o.optString("af", null),
+                    optString(o, "af"),
                     o.getLong("t"),
                     o.optString("o", ORIGIN_X)
             );
         } catch (JSONException | RuntimeException e) {
             return null;
         }
+    }
+
+    /** Android's optString(key, null) returns "null" for JSON null values. */
+    static String optString(JSONObject o, String key) {
+        return o.isNull(key) ? null : o.optString(key, null);
     }
 
     private static String emptyToNull(String s) {

@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Account lookups: memory and disk cache, then the X-Posed community cache in batches,
@@ -40,6 +41,7 @@ final class Lookup {
     private static final long CLOUD_BATCH_DELAY_MS = 200;
     private static final long X_INTERVAL_MS = 350;
     private static final int X_MAX_CONCURRENT = 2;
+    private static final long X_TIMEOUT_MS = 30_000;
 
     private static final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "xposed-lookup");
@@ -65,6 +67,7 @@ final class Lookup {
     private static int xActive;
     private static long xBackoffUntil;
     private static int xFailures;
+    private static long lastXStart;
 
     private static volatile Listener listener;
     private static volatile SharedPreferences prefs;
@@ -201,8 +204,9 @@ final class Lookup {
             return;
         }
         long now = System.currentTimeMillis();
-        if (now < xBackoffUntil) {
-            scheduleX(xBackoffUntil - now);
+        long next = Math.max(xBackoffUntil, lastXStart + X_INTERVAL_MS);
+        if (now < next) {
+            scheduleX(next - now);
             return;
         }
 
@@ -210,7 +214,21 @@ final class Lookup {
         String handle = it.next();
         it.remove();
         xActive++;
+        lastXStart = now;
+
+        // Settles the slot exactly once: on the result, or after a timeout if X's
+        // coroutine never resumes, so a lost request can't hold a slot forever.
+        AtomicBoolean done = new AtomicBoolean();
+        worker.schedule(() -> {
+            if (done.compareAndSet(false, true)) {
+                xActive--;
+                Log.w(Hooks.TAG, "About lookup timed out for @" + handle);
+                pumpX();
+            }
+        }, X_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+
         XAboutApi.fetch(handle, (info, error) -> worker.execute(() -> {
+            if (!done.compareAndSet(false, true)) return;
             xActive--;
             if (error != null) {
                 xFailures++;
@@ -220,12 +238,14 @@ final class Lookup {
             } else {
                 xFailures = 0;
                 AccountInfo result = info != null ? info : AccountInfo.empty(System.currentTimeMillis());
-                store(handle, result);
+                AccountInfo previous = peek(handle);
+                // A refresh that finds nothing must not wipe data we already have.
+                if (!result.isEmpty() || previous == null || previous.isEmpty()) store(handle, result);
                 if (!result.isEmpty()) CloudCache.contribute(handle, result);
             }
             pumpX();
         }));
-        if (!xQueue.isEmpty()) scheduleX(X_INTERVAL_MS);
+        pumpX();
     }
 
     private static void scheduleX(long delayMs) {

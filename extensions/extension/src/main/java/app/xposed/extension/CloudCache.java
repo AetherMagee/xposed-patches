@@ -65,15 +65,15 @@ final class CloudCache {
 
                 long observedAt = entry.optLong("t", 0) * 1000;
                 if (observedAt <= 0 || now - observedAt > MAX_AGE_MS) continue;
-                String location = sanitize(entry.optString("l", null));
-                String source = sanitize(entry.optString("d", null));
+                String location = sanitize(AccountInfo.optString(entry, "l"));
+                String source = sanitize(AccountInfo.optString(entry, "d"));
                 if (location == null && source == null) continue;
 
                 hits.put(handle, new AccountInfo(
                         location,
                         source,
                         entry.optBoolean("a", true),
-                        sanitize(entry.optString("af", null)),
+                        sanitize(AccountInfo.optString(entry, "af")),
                         observedAt,
                         AccountInfo.ORIGIN_CLOUD
                 ));

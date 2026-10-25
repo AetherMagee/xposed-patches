@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.regex.Pattern;
@@ -52,8 +53,8 @@ final class HeaderBadges {
             binding = new Binding();
             bindings.put(view, binding);
             installTouchListener(view);
-            allowOverflow(view);
         }
+        allowOverflow(view);
         binding.name = name;
         binding.username = username;
         binding.timestamp = timestamp;
@@ -82,7 +83,7 @@ final class HeaderBadges {
         if (username == null) return null;
         String s = username.trim();
         if (s.startsWith("@")) s = s.substring(1);
-        return HANDLE.matcher(s).matches() ? s.toLowerCase() : null;
+        return HANDLE.matcher(s).matches() ? s.toLowerCase(Locale.ROOT) : null;
     }
 
     private static String describe(AccountInfo info) {
