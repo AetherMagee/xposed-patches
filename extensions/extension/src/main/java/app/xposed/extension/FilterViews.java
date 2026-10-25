@@ -1,7 +1,6 @@
 package app.xposed.extension;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
@@ -133,18 +132,15 @@ final class FilterViews {
         }
     }
 
-    /** X-Posed's highlight: a faint tint with an accent rail on the leading edge. */
-    private static final class Highlight extends Drawable implements View.OnLayoutChangeListener {
+    /** X-Posed's highlight: a faint tint with an accent rail on the leading edge, at the chosen contrast. */
+    static final class Highlight extends Drawable implements View.OnLayoutChangeListener {
         private final Paint paint = new Paint();
-        private final int surface, accent;
-        private final float railWidth;
+        private final boolean dark;
+        private final float density;
 
         Highlight(Context context) {
-            boolean dark = (context.getResources().getConfiguration().uiMode
-                    & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-            surface = dark ? 0x0FC3A06C : 0x0B906124;
-            accent = dark ? 0xFFC3A06C : 0xFF906124;
-            railWidth = 2 * context.getResources().getDisplayMetrics().density;
+            dark = new Ui(context).dark;
+            density = context.getResources().getDisplayMetrics().density;
         }
 
         @Override
@@ -154,11 +150,15 @@ final class FilterViews {
 
         @Override
         public void draw(Canvas canvas) {
+            float[] contrast = Settings.highlightContrast();
+            // X-Posed's --xp-filter-surface: 6% / 4.5% of the accent, scaled by the contrast.
+            int accent = dark ? 0xC3A06C : 0x906124;
+            float alpha = Math.min(1, (dark ? 0.06f : 0.045f) * contrast[0]);
             Rect b = getBounds();
-            paint.setColor(surface);
+            paint.setColor(Math.round(alpha * 255) << 24 | accent);
             canvas.drawRect(b, paint);
-            paint.setColor(accent);
-            canvas.drawRect(b.left, b.top, b.left + railWidth, b.bottom, paint);
+            paint.setColor(0xFF000000 | accent);
+            canvas.drawRect(b.left, b.top, b.left + contrast[1] * density, b.bottom, paint);
         }
 
         @Override

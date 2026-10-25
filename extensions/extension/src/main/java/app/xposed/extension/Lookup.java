@@ -238,13 +238,16 @@ final class Lookup {
         XAboutApi.fetch(handle, (info, error) -> worker.execute(() -> {
             if (!done.compareAndSet(false, true)) return;
             xActive--;
+            Stats.add(Stats.X_LOOKUPS, 1);
             if (error != null) {
+                Stats.add(Stats.X_FAILED, 1);
                 xFailures++;
                 // Rate limits and outages: back off up to ~15 minutes.
                 if (xFailures >= 3) xBackoffUntil = System.currentTimeMillis() + Math.min(15, 1L << (xFailures - 3)) * 60_000;
                 Log.w(Hooks.TAG, "About lookup failed for @" + handle + ": " + error);
             } else {
                 xFailures = 0;
+                if (info != null) Stats.add(Stats.X_FOUND, 1);
                 AccountInfo result = info != null ? info : AccountInfo.empty(System.currentTimeMillis());
                 AccountInfo previous = peek(handle);
                 // A refresh that finds nothing must not wipe data we already have.

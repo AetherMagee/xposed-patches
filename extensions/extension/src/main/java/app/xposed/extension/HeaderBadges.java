@@ -66,6 +66,7 @@ final class HeaderBadges {
 
         Lookup.init(view.getContext());
         Settings.init(view.getContext());
+        Stats.init(view.getContext());
         AccountInfo info = Lookup.get(handle);
         FilterViews.apply(view, Filters.actionFor(info));
         if (info == null || info.isEmpty()) return badges;

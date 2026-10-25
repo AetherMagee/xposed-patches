@@ -40,8 +40,10 @@ final class SettingsScreen {
     private final Ui ui;
     private final SharedPreferences prefs;
     private final Dialog dialog;
-    private final LinearLayout list;
+    private static final java.text.NumberFormat NUMBERS = java.text.NumberFormat.getIntegerInstance();
+    private LinearLayout list;
     private LinearLayout preview;
+    private View highlightPreview;
 
     private SettingsScreen(Context context) {
         this.context = context;
@@ -89,10 +91,15 @@ final class SettingsScreen {
         List<String> filtered = Filters.locations();
         row("Countries and regions", filtered.isEmpty() ? "None" : String.join(", ", filtered), null,
                 v -> new CountryPicker().show());
+        highlightPreview = mockPost();
+        list.addView(highlightPreview, Ui.matchWidth());
+        choice("Highlight contrast", "How strongly highlighted posts stand out. Standard matches X-Posed.",
+                Settings.HIGHLIGHT_CONTRAST, new String[]{"Subtle", "Standard", "Strong", "Bold"},
+                new String[]{"subtle", "standard", "strong", "bold"}, "standard");
 
         section("Privacy");
         toggle("Don't report passive engagement",
-                "Impressions, viewing time and video views of highlighted or hidden posts aren't sent to X. "
+                "Impressions, viewing time, video views and opening of highlighted or hidden posts aren't sent to X. "
                         + "Likes, replies and reposts still are.", Settings.ZERO_ENGAGEMENT, true);
         toggle("Community cache",
                 "Look up accounts in the X-Posed community cache and share what X reports with it. "
@@ -107,6 +114,13 @@ final class SettingsScreen {
         });
         list.addView(clear, Ui.matchWidth());
 
+        section("Statistics");
+        long posts = Stats.get(Stats.POSTS);
+        long requested = Stats.get(Stats.CLOUD_REQUESTED);
+        String summary = NUMBERS.format(posts) + " posts seen"
+                + (requested > 0 ? " · " + percent(Stats.get(Stats.CLOUD_HITS), requested) + " cache hits" : "");
+        row("View statistics", summary, null, v -> showStats());
+
         section("About");
         TextView about = ui.text("Based on X-Posed by Alexander Hagenah (github.com/xaitax/x-account-location-device). "
                 + "Badges show what X reports about an account, not anyone's live location or the device used for a post.",
@@ -117,6 +131,7 @@ final class SettingsScreen {
 
     private void changed() {
         updatePreview();
+        if (highlightPreview != null) highlightPreview.invalidate();
         HeaderBadges.refreshAll();
     }
 
@@ -133,6 +148,153 @@ final class SettingsScreen {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(22 * badge.spanScale()));
         lp.leftMargin = ui.dp(6);
         preview.addView(image, lp);
+    }
+
+    /** A post as it would look when highlighted, for the contrast setting. */
+    private View mockPost() {
+        LinearLayout post = new LinearLayout(context);
+        post.setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12));
+        View avatar = new View(context);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(ui.divider);
+        avatar.setBackground(circle);
+        post.addView(avatar, new LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)));
+        LinearLayout body = new LinearLayout(context);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(ui.dp(12), 0, 0, 0);
+        LinearLayout header = new LinearLayout(context);
+        header.addView(ui.text("Example", 15, true, ui.text));
+        TextView meta = ui.text("  @example · 1h", 15, false, ui.secondary);
+        header.addView(meta);
+        body.addView(header);
+        body.addView(ui.text("This is how posts from countries you filter look in your timeline.", 15, false, ui.text));
+        post.addView(body, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        FilterViews.Highlight highlight = new FilterViews.Highlight(context);
+        post.getOverlay().add(highlight);
+        post.addOnLayoutChangeListener(highlight);
+        return post;
+    }
+
+    private void showStats() {
+        Dialog d = fullScreen(context, ui);
+        ScrollView scroll = new ScrollView(context);
+        LinearLayout page = new LinearLayout(context);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(0, 0, 0, ui.dp(24));
+        scroll.addView(page);
+        LinearLayout saved = list;
+        // Reuse the row builders for the stats page.
+        listOverride(page);
+
+        long posts = Stats.get(Stats.POSTS);
+        List<Stats.Entry> seen = Stats.top(false);
+        section("Posts seen");
+        TextView total = ui.text(NUMBERS.format(posts) + " posts from " + seen.size() + " countries and regions"
+                + (Stats.get(Stats.POSTS_UNKNOWN) > 0 ? ", " + NUMBERS.format(Stats.get(Stats.POSTS_UNKNOWN)) + " not yet looked up" : ""),
+                13, false, ui.secondary);
+        total.setPadding(ui.dp(16), 0, ui.dp(16), ui.dp(8));
+        page.addView(total);
+        bars(seen, posts);
+
+        section(Settings.highlightMode() ? "Highlighted" : "Hidden");
+        List<Stats.Entry> filtered = Stats.top(true);
+        long filteredTotal = 0;
+        for (Stats.Entry e : filtered) filteredTotal += e.count;
+        if (filtered.isEmpty()) {
+            TextView none = ui.text("No filtered posts yet.", 13, false, ui.secondary);
+            none.setPadding(ui.dp(16), 0, ui.dp(16), 0);
+            page.addView(none);
+        } else {
+            TextView share = ui.text(NUMBERS.format(filteredTotal) + " posts, " + percent(filteredTotal, posts) + " of all posts seen",
+                    13, false, ui.secondary);
+            share.setPadding(ui.dp(16), 0, ui.dp(16), ui.dp(8));
+            page.addView(share);
+            bars(filtered, filteredTotal);
+        }
+
+        section("Lookups");
+        long requested = Stats.get(Stats.CLOUD_REQUESTED), hits = Stats.get(Stats.CLOUD_HITS);
+        stat("Community cache hit rate", requested == 0 ? "–" : percent(hits, requested),
+                NUMBERS.format(hits) + " of " + NUMBERS.format(requested) + " accounts were already in the cache");
+        stat("Looked up on X", NUMBERS.format(Stats.get(Stats.X_LOOKUPS)),
+                NUMBERS.format(Stats.get(Stats.X_FOUND)) + " with a location, " + NUMBERS.format(Stats.get(Stats.X_FAILED)) + " failed");
+        stat("Shared with the community cache", NUMBERS.format(Stats.get(Stats.CONTRIBUTED_ACCEPTED)),
+                NUMBERS.format(Stats.get(Stats.CONTRIBUTED)) + " accounts sent, counted when the cache accepted them");
+
+        TextView reset = ui.text("Reset statistics", 15, false, DESTRUCTIVE);
+        reset.setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(16));
+        reset.setBackground(ui.rowBackground());
+        reset.setOnClickListener(v -> {
+            Stats.reset();
+            d.dismiss();
+        });
+        page.addView(reset, Ui.matchWidth());
+
+        listOverride(saved);
+        d.setContentView(page(context, ui, "Statistics", d, scroll));
+        d.setOnDismissListener(x -> build());
+        d.show();
+    }
+
+    private void listOverride(LinearLayout target) {
+        list = target;
+    }
+
+    /** One row per location: flag, name, count and a bar for its share, top 10 then the rest summed. */
+    private void bars(List<Stats.Entry> entries, long total) {
+        int shown = Math.min(10, entries.size());
+        long rest = 0;
+        for (int i = shown; i < entries.size(); i++) rest += entries.get(i).count;
+        for (int i = 0; i < shown; i++) bar(entries.get(i).location, entries.get(i).count, total);
+        if (rest > 0) bar(null, rest, total);
+    }
+
+    private void bar(String location, long count, long total) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(ui.dp(16), ui.dp(6), ui.dp(16), ui.dp(6));
+        LinearLayout line = new LinearLayout(context);
+        String flag = location == null ? null : Countries.flagFor(location);
+        String label = location == null ? "Others" : (flag != null ? flag : Countries.UNKNOWN_FLAG) + "  " + location;
+        line.addView(ui.text(label, 15, false, ui.text), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        line.addView(ui.text(NUMBERS.format(count) + " · " + percent(count, total), 15, false, ui.secondary));
+        row.addView(line);
+        FrameLayout track = new FrameLayout(context);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ui.divider);
+        bg.setCornerRadius(ui.dp(2));
+        track.setBackground(bg);
+        View fill = new View(context);
+        GradientDrawable fg = new GradientDrawable();
+        fg.setColor(Ui.ACCENT);
+        fg.setCornerRadius(ui.dp(2));
+        fill.setBackground(fg);
+        track.addView(fill, new FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
+        track.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            int width = Math.round((r - l) * (total == 0 ? 0 : (float) count / total));
+            if (fill.getLayoutParams().width != width) {
+                fill.getLayoutParams().width = width;
+                fill.post(fill::requestLayout);
+            }
+        });
+        LinearLayout.LayoutParams trackLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(4));
+        trackLp.topMargin = ui.dp(6);
+        row.addView(track, trackLp);
+        list.addView(row, Ui.matchWidth());
+    }
+
+    /** A stats row: title and explanation on the left, the figure on the right. */
+    private void stat(String title, String value, String summary) {
+        LinearLayout row = row(title, summary, ui.text(value, 17, true, ui.text), null);
+        row.setBackground(null);
+        row.setClickable(false);
+    }
+
+    private static String percent(long part, long whole) {
+        if (whole <= 0) return "0%";
+        return Math.round(100.0 * part / whole) + "%";
     }
 
     private void section(String title) {

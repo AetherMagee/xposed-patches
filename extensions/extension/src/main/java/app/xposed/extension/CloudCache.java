@@ -49,6 +49,7 @@ final class CloudCache {
         if (!Settings.communityCache() || System.currentTimeMillis() < cooldownUntil) return null;
         try {
             String users = URLEncoder.encode(String.join(",", handles), "UTF-8");
+            Stats.add(Stats.CLOUD_REQUESTED, handles.size());
             JSONObject response = new JSONObject(request("GET", API_URL + "/lookup?users=" + users, null));
             JSONObject results = response.optJSONObject("results");
             Map<String, AccountInfo> hits = new HashMap<>();
@@ -79,6 +80,7 @@ final class CloudCache {
                         parseId(AccountInfo.optString(entry, "id"))
                 ));
             }
+            Stats.add(Stats.CLOUD_HITS, hits.size());
             return hits;
         } catch (Exception e) {
             cooldownUntil = System.currentTimeMillis() + FAILURE_COOLDOWN_MS;
@@ -126,7 +128,9 @@ final class CloudCache {
         try {
             JSONObject entries = new JSONObject();
             for (Map.Entry<String, JSONObject> e : contributions.entrySet()) entries.put(e.getKey(), e.getValue());
-            request("POST", API_URL + "/contribute", new JSONObject().put("entries", entries).toString());
+            String body = request("POST", API_URL + "/contribute", new JSONObject().put("entries", entries).toString());
+            Stats.add(Stats.CONTRIBUTED, contributions.size());
+            Stats.add(Stats.CONTRIBUTED_ACCEPTED, new JSONObject(body).optInt("accepted", contributions.size()));
 
             long now = System.currentTimeMillis();
             if (contributed.size() > 10_000) contributed.clear();

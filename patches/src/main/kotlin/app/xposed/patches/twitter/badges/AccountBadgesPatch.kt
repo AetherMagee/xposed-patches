@@ -107,6 +107,8 @@ val accountBadgesPatch = bytecodePatch(
         val eventNameField = ScribeLogEventNameFingerprint.originalMethod.fieldReadAfter("android:", Opcode.IGET_OBJECT)
         val detailsField = ScribeItemSerializeFingerprint.originalMethod.fieldReadBefore("tweet_details", Opcode.IGET_OBJECT)
         val authorIdField = ScribeItemSerializeFingerprint.originalMethod.fieldReadBefore("author_id", Opcode.IGET_WIDE)
+        val itemIdField = ScribeItemSerializeFingerprint.originalMethod.fieldReadBefore("id", Opcode.IGET_WIDE)
+        val itemTypeField = ScribeItemSerializeFingerprint.originalMethod.fieldReadBefore("item_type", Opcode.IGET)
         require(eventNameField.type == "Ljava/lang/String;") { "Unexpected event name field $eventNameField" }
         require(authorIdField.definingClass == detailsField.type) { "Unexpected author id field $authorIdField" }
         ScribeFieldsExtensionFingerprint.method.addInstructions(
@@ -119,6 +121,8 @@ val accountBadgesPatch = bytecodePatch(
                     ScribeItemSerializeFingerprint.originalClassDef.type.toJavaClassName(),
                     detailsField.name,
                     authorIdField.name,
+                    itemIdField.name,
+                    itemTypeField.name,
                 ).joinToString("|"),
             ),
         )

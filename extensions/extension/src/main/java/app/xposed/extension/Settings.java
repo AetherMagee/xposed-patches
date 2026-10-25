@@ -17,6 +17,7 @@ final class Settings {
     static final String FILTER_LOCATIONS = "filter_locations";
     static final String ZERO_ENGAGEMENT = "zero_engagement";
     static final String COMMUNITY_CACHE = "community_cache";
+    static final String HIGHLIGHT_CONTRAST = "highlight_contrast";
 
     static final String MODE_HIGHLIGHT = "highlight";
     static final String MODE_HIDE = "hide";
@@ -67,6 +68,20 @@ final class Settings {
 
     static boolean highlightMode() {
         return !MODE_HIDE.equals(string(FILTER_MODE, MODE_HIGHLIGHT));
+    }
+
+    /** Tint opacity multiplier and rail width in dp for highlighted posts; "standard" is X-Posed's look. */
+    static float[] highlightContrast() {
+        switch (string(HIGHLIGHT_CONTRAST, "standard")) {
+            case "subtle":
+                return new float[]{0.5f, 2};
+            case "strong":
+                return new float[]{3, 3};
+            case "bold":
+                return new float[]{6, 4};
+            default:
+                return new float[]{1, 2};
+        }
     }
 
     static boolean zeroEngagement() {
