@@ -126,3 +126,6 @@ node_modules/
 # Ignore IDEA files
 .idea/
 local.properties
+
+# Local on-device test helper
+/scripts/

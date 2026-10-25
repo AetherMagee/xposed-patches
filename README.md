@@ -59,8 +59,7 @@ GITHUB_ACTOR=<user> GITHUB_TOKEN=$(gh auth token) ./gradlew :patches:buildAndroi
 ```
 
 The bundle is written to `patches/build/libs/patches-<version>.mpp`. Hook notes for porting
-to new X versions are in [docs/HOOKS.md](docs/HOOKS.md). `scripts/deploy.sh` rebuilds and
-re-patches X on a rooted test device through Morphe Manager.
+to new X versions are in [docs/HOOKS.md](docs/HOOKS.md).
 
 ## Credits
 
