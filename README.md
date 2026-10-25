@@ -44,8 +44,21 @@ and what X reports about them is shared back. Your X session is never sent there
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
+> **[v1.0.0](https://github.com/AetherMagee/xposed-patches/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patches total
+<details open>
+<summary>📦 Twitter&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
 
-<!-- Do not modify this section by hand. The patch list is generated when release.yml creates a new release. -->
+**🎯 Supported versions:**
+
+| 12.19.1-release.0 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Account location badges](#account-location-badges) | Shows X-Posed style country badges next to names and highlights or hides posts from chosen countries, without reporting passive engagement with them. Data comes from the X-Posed community cache, falling back to X's "About this account". Tap a badge for account details and settings. |  |
+
+</details>
 
 <!-- PATCHES_END -->
 
