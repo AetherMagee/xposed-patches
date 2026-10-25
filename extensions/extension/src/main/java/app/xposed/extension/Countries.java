@@ -369,6 +369,13 @@ final class Countries {
         return s.toLowerCase(Locale.ROOT);
     }
 
+    /** Key that matches every spelling of a location, for comparing filters. */
+    static String canonicalKey(String location) {
+        String k = key(location);
+        String canonical = ALIASES.get(k);
+        return canonical != null ? canonical : k;
+    }
+
     /** True when the name is one of the English spellings X-Posed knows. */
     static boolean isKnownEnglish(String location) {
         if (location == null) return false;

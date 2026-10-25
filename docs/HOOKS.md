@@ -25,6 +25,11 @@ fingerprint by the strings/classes noted instead.
   `explore/timeline/events/r.java`, `longform/threadreader/implementation/o.java`, `app/profiles/prompt/h.java`.
 - MVP badge: decorate `username` with flag and device emoji at the start of `c()`.
 
+## Filters (hide/highlight)
+- Quoted posts: the quote's TweetHeaderView sits inside `com.twitter.tweetview.core.QuoteView`.
+- Rows: the RecyclerView child above the header (`androidx.recyclerview.widget.RecyclerView`, unobfuscated).
+- X resets row visibility/size after binding the header, so verdicts are re-applied in a `post()`.
+
 ## Cloud cache (x-posed)
 - `GET https://x-posed-cache.xaitax.workers.dev/lookup?users=a,b` (<=100 handles), no auth.
   Result keys: l=location, d=source, a=location accurate, af=affiliation, id, t=timestamp.

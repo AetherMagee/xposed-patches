@@ -45,6 +45,7 @@ final class HeaderBadges {
         String handle = normalizeHandle(username);
         if (handle == null) {
             bindings.remove(view);
+            FilterViews.apply(view, Filters.Action.NONE);
             return badges;
         }
 
@@ -64,7 +65,9 @@ final class HeaderBadges {
         binding.pressed = false;
 
         Lookup.init(view.getContext());
+        Filters.init(view.getContext());
         AccountInfo info = Lookup.get(handle);
+        FilterViews.apply(view, Filters.actionFor(info));
         if (info == null || info.isEmpty()) return badges;
 
         BadgeDrawable drawable = BadgeDrawable.create(view.getContext(), info);
@@ -90,10 +93,16 @@ final class HeaderBadges {
         return info.location != null ? "Account based in " + info.location : "Account details";
     }
 
+    /** Re-binds every header, e.g. after the filters changed. */
+    static void refreshAll() {
+        onAccountUpdated(null);
+    }
+
+    /** Re-binds the headers showing handle, or all headers when handle is null. */
     private static void onAccountUpdated(String handle) {
         for (Map.Entry<View, Binding> entry : new ArrayList<>(bindings.entrySet())) {
             Binding b = entry.getValue();
-            if (!handle.equals(b.handle)) continue;
+            if (handle != null && !handle.equals(b.handle)) continue;
             try {
                 setDataMethod(entry.getKey()).invoke(entry.getKey(), b.name, b.username, b.timestamp, b.badges);
             } catch (Exception e) {

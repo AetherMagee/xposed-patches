@@ -15,6 +15,10 @@ Misses fall back to X's own "About this account" query, sent through the app's o
 authenticated client. Fresh English results are contributed back to the cache,
 like the extension does. Results are cached on the device for 60 days.
 
+**Country filters**: from a badge's details, choose **Filters…** to pick countries or X
+regions whose posts are highlighted (default, X-Posed's tint and rail) or hidden. A
+filtered quoted account only affects its quote card, never the post quoting it.
+
 Shows what X reports, not anyone's live location or the device used for a post.
 
 Supported: X 12.19.1-release.0 (APKM).
