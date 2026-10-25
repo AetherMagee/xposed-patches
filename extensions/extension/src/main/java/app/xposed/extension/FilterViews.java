@@ -40,6 +40,8 @@ final class FilterViews {
      */
     static void apply(View header, Filters.Action action) {
         Filters.Action previous = verdicts.put(header, action);
+        // Nothing to apply or undo: the common case while scrolling past unfiltered posts.
+        if (action == Filters.Action.NONE && (previous == null || previous == Filters.Action.NONE)) return;
         applyNow(header, action);
         if (action != Filters.Action.NONE || previous != null && previous != Filters.Action.NONE) {
             header.post(() -> {
@@ -50,9 +52,10 @@ final class FilterViews {
     }
 
     private static void applyNow(View header, Filters.Action action) {
-        View quote = quoteAncestor(header);
-        View target = quote != null ? quote : rowAncestor(header);
-        if (target == null) return;
+        View[] targets = targets(header);
+        if (targets == null) return;
+        View quote = targets[0];
+        View target = quote != null ? quote : targets[1];
 
         setHighlighted(target, action == Filters.Action.HIGHLIGHT);
         if (quote != null) {
@@ -60,6 +63,20 @@ final class FilterViews {
         } else {
             setCollapsed(target, action == Filters.Action.HIDE);
         }
+    }
+
+    /** Each header's quote card (or null) and row; the view tree around a header doesn't change. */
+    private static final Map<View, View[]> ancestry = new WeakHashMap<>();
+    private static final Map<Class<?>, Boolean> recyclerClasses = new java.util.HashMap<>();
+
+    private static View[] targets(View header) {
+        View[] cached = ancestry.get(header);
+        if (cached != null) return cached;
+        View row = rowAncestor(header);
+        if (row == null) return null; // not attached yet; look again next time
+        View[] found = {quoteAncestor(header), row};
+        ancestry.put(header, found);
+        return found;
     }
 
     /** The quote card a header belongs to, or null for a post's own header. */
@@ -82,10 +99,15 @@ final class FilterViews {
     }
 
     private static boolean isRecyclerView(ViewParent p) {
-        for (Class<?> c = p == null ? null : p.getClass(); c != null; c = c.getSuperclass()) {
-            if (c.getName().equals(RECYCLER_VIEW)) return true;
+        if (p == null) return false;
+        Boolean known = recyclerClasses.get(p.getClass());
+        if (known != null) return known;
+        boolean result = false;
+        for (Class<?> c = p.getClass(); c != null && !result; c = c.getSuperclass()) {
+            result = c.getName().equals(RECYCLER_VIEW);
         }
-        return false;
+        recyclerClasses.put(p.getClass(), result);
+        return result;
     }
 
     /** Enforced on every bind: X resets row and quote state when it re-binds a recycled row. */

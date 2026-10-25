@@ -7,7 +7,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Keeps passive engagement with filtered posts (impressions, dwell time, video views, opening
@@ -40,7 +42,7 @@ final class Engagement {
             List<?> list = (List<?>) items.get(event);
             if (list == null || list.isEmpty()) return false;
             if (name.endsWith(":results")) countShown(list);
-            if (!Settings.zeroEngagement()) return false;
+            if (!Settings.zeroEngagement() || !Filters.any()) return false;
             // Mixed events (e.g. a list of shown posts) keep their other items.
             if (!list.removeIf(Engagement::isFilteredItem)) return false;
             Log.d(Hooks.TAG, "Withheld " + name + (list.isEmpty() ? "" : " (partially)"));
@@ -55,8 +57,19 @@ final class Engagement {
     /** Elements whose click just opens the post, as opposed to liking, replying and so on. */
     private static final Set<String> OPEN_ELEMENTS = new HashSet<>(Arrays.asList("tweet", "tweet_text"));
 
-    /** Event names are "page:section:component:element:action". */
+    /** Event names repeat endlessly and come from a small set, so the verdict is cached per name. */
+    private static final Map<String, Boolean> passiveNames = new ConcurrentHashMap<>();
+
     private static boolean isPassive(String name) {
+        Boolean cached = passiveNames.get(name);
+        if (cached != null) return cached;
+        boolean passive = classify(name);
+        if (passiveNames.size() < 5000) passiveNames.put(name, passive);
+        return passive;
+    }
+
+    /** Event names are "page:section:component:element:action". */
+    private static boolean classify(String name) {
         String[] parts = name.toLowerCase(Locale.ROOT).split(":", -1);
         String action = parts[parts.length - 1];
         String element = parts.length > 1 ? parts[parts.length - 2] : "";

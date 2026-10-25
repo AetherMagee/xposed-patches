@@ -60,5 +60,10 @@ public final class Hooks {
     /** Called when X creates its GraphQL client. */
     public static void onGraphqlApi(Object api) {
         XAboutApi.setGraphqlApi(api);
+        // Build the country tables and icon paths off the main thread, before the first post shows.
+        Lookup.runOnWorker(() -> {
+            Countries.flagFor("United States");
+            Glyphs.forSource("");
+        });
     }
 }

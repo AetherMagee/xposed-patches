@@ -12,10 +12,10 @@ import java.util.Set;
 final class Filters {
     enum Action {NONE, HIDE, HIGHLIGHT}
 
-    /** Display names as saved; matched by canonical key. */
-    private static Set<String> locations = Collections.emptySet();
-    private static Set<String> keys = Collections.emptySet();
-    private static boolean loaded;
+    /** Display names as saved, and their canonical keys. Replaced wholesale, read without locking. */
+    private static volatile Set<String> locations = Collections.emptySet();
+    private static volatile Set<String> keys = Collections.emptySet();
+    private static volatile boolean loaded;
     // Held strongly: SharedPreferences only keeps weak references to listeners.
     private static final SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
         if (Settings.FILTER_LOCATIONS.equals(key)) reload();
@@ -24,21 +24,29 @@ final class Filters {
     private Filters() {
     }
 
-    static synchronized Action actionFor(AccountInfo info) {
+    /** Called for every post header and client event item, so it avoids locks and allocation. */
+    static Action actionFor(AccountInfo info) {
         if (info == null || info.location == null) return Action.NONE;
-        load();
-        if (keys.isEmpty() || !keys.contains(Countries.canonicalKey(info.location))) return Action.NONE;
+        if (!loaded) load();
+        Set<String> k = keys;
+        if (k.isEmpty() || !k.contains(Countries.canonicalKey(info.location))) return Action.NONE;
         return Settings.highlightMode() ? Action.HIGHLIGHT : Action.HIDE;
     }
 
-    static synchronized boolean isFiltered(String location) {
-        load();
+    /** True when any filter is set; lets callers skip per-item work. */
+    static boolean any() {
+        if (!loaded) load();
+        return !keys.isEmpty();
+    }
+
+    static boolean isFiltered(String location) {
+        if (!loaded) load();
         return location != null && keys.contains(Countries.canonicalKey(location));
     }
 
     /** Filtered locations, sorted for display. */
-    static synchronized List<String> locations() {
-        load();
+    static List<String> locations() {
+        if (!loaded) load();
         List<String> list = new ArrayList<>(locations);
         Collections.sort(list, String.CASE_INSENSITIVE_ORDER);
         return list;
@@ -54,7 +62,7 @@ final class Filters {
         reload();
     }
 
-    private static void load() {
+    private static synchronized void load() {
         if (loaded) return;
         SharedPreferences prefs = Settings.prefs();
         if (prefs == null) return;
@@ -72,7 +80,7 @@ final class Filters {
             // One entry per country, whichever spelling was saved first.
             if (k.add(Countries.canonicalKey(location))) l.add(location);
         }
-        locations = l;
-        keys = k;
+        locations = Collections.unmodifiableSet(l);
+        keys = Collections.unmodifiableSet(k);
     }
 }

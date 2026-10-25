@@ -44,45 +44,55 @@ final class BadgeDrawable extends Drawable {
 
     private static final Map<String, Rect> FLAG_BOUNDS = new HashMap<>();
 
-    private final BadgeStyle.Size size = Settings.badgeSize();
+    private final Settings.Badge config;
+    private final BadgeStyle.Size size;
+    private final boolean dark, warning;
+    private final String location, source;
     private final List<Item> items = new ArrayList<>();
     private final String flag;
     private final Glyphs.Glyph deviceGlyph;
-    private final boolean showInfo = Settings.badgeInfo();
-    private final boolean background = Settings.badgeBackground();
+    private final boolean showInfo;
+    private final boolean background;
     private final int fillColor, lineColor, iconColor, alertColor;
     private final float padding, detailsPadding, width;
 
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final TextPaint emojiPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF tmp = new RectF();
-    private final Matrix matrix = new Matrix();
-    private final float[] matrixValues = new float[9];
+    // Shared: badges are created and drawn on the main thread only.
+    private static final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private static final TextPaint emojiPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private static final RectF tmp = new RectF();
+    private static final Matrix matrix = new Matrix();
+    private static final float[] matrixValues = new float[9];
     /** Where the badge was last drawn, in the host view's coordinates. */
     private final RectF drawnRect = new RectF();
     private boolean drawn;
 
-    private BadgeDrawable(Context context, AccountInfo info) {
-        if (Settings.badgeFlags() && info.location != null) {
+    private BadgeDrawable(AccountInfo info, Settings.Badge config, boolean dark) {
+        this.config = config;
+        this.dark = dark;
+        size = config.size;
+        showInfo = config.info;
+        background = config.background;
+        location = info.location;
+        source = info.source;
+        warning = info.hasLocationWarning();
+        if (config.flags && info.location != null) {
             String f = Countries.flagFor(info.location);
             flag = f != null ? f : Countries.UNKNOWN_FLAG;
             items.add(new Item(Kind.FLAG, size.icon));
         } else {
             flag = null;
         }
-        if (Settings.badgeDevices() && info.source != null) {
+        if (config.devices && info.source != null) {
             deviceGlyph = Glyphs.forSource(info.source);
             items.add(new Item(Kind.DEVICE, size.icon));
         } else {
             deviceGlyph = null;
         }
         // Like the extension, the warning belongs to the location and needs a flag.
-        if (Settings.badgeVpn() && flag != null && info.hasLocationWarning()) {
+        if (config.vpn && flag != null && info.hasLocationWarning()) {
             items.add(new Item(Kind.VPN, size.icon - 2));
         }
 
-        boolean dark = (context.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         // X-Posed's graphite theme tokens.
         fillColor = dark ? 0x12A5AFB6 : 0x0920272A;
         lineColor = dark ? 0x24A5AFB6 : 0x1F20272A;
@@ -99,8 +109,19 @@ final class BadgeDrawable extends Drawable {
 
     /** Null when the account has nothing to show with the current style. */
     static BadgeDrawable create(Context context, AccountInfo info) {
-        BadgeDrawable d = new BadgeDrawable(context, info);
+        BadgeDrawable d = new BadgeDrawable(info, Settings.badge(), isDark(context));
         return d.items.isEmpty() ? null : d;
+    }
+
+    /** True when this badge would look the same for info, so a header can keep it across binds. */
+    boolean looksLike(Context context, AccountInfo info) {
+        return config == Settings.badge() && dark == isDark(context) && warning == info.hasLocationWarning()
+                && java.util.Objects.equals(location, info.location) && java.util.Objects.equals(source, info.source);
+    }
+
+    private static boolean isDark(Context context) {
+        return (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
     float spanScale() {
@@ -198,15 +219,12 @@ final class BadgeDrawable extends Drawable {
     /** Emoji flag, scaled to fit an icon box the way the extension sizes its Twemoji image. */
     private void drawFlag(Canvas canvas, float left, float top, float box) {
         final float reference = 100;
-        Rect b;
-        synchronized (FLAG_BOUNDS) {
-            b = FLAG_BOUNDS.get(flag);
-            if (b == null) {
-                b = new Rect();
-                emojiPaint.setTextSize(reference);
-                emojiPaint.getTextBounds(flag, 0, flag.length(), b);
-                FLAG_BOUNDS.put(flag, b);
-            }
+        Rect b = FLAG_BOUNDS.get(flag);
+        if (b == null) {
+            b = new Rect();
+            emojiPaint.setTextSize(reference);
+            emojiPaint.getTextBounds(flag, 0, flag.length(), b);
+            FLAG_BOUNDS.put(flag, b);
         }
         if (b.isEmpty()) return;
         float scale = Math.min(box / b.width(), box / b.height());
@@ -233,14 +251,10 @@ final class BadgeDrawable extends Drawable {
 
     @Override
     public void setAlpha(int alpha) {
-        paint.setAlpha(alpha);
-        emojiPaint.setAlpha(alpha);
     }
 
     @Override
     public void setColorFilter(ColorFilter colorFilter) {
-        paint.setColorFilter(colorFilter);
-        emojiPaint.setColorFilter(colorFilter);
     }
 
     @Override

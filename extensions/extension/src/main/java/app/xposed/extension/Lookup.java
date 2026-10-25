@@ -38,6 +38,7 @@ final class Lookup {
     private static final long RETRY_MS = TimeUnit.MINUTES.toMillis(5);
     private static final int MEMORY_LIMIT = 5000;
     private static final int DISK_LIMIT = 20000;
+    private static final long WRITE_DELAY_MS = 3000;
 
     private static final long CLOUD_BATCH_DELAY_MS = 200;
     private static final long X_INTERVAL_MS = 350;
@@ -69,6 +70,8 @@ final class Lookup {
     private static long xBackoffUntil;
     private static int xFailures;
     private static long lastXStart;
+    private static final Map<String, String> pendingWrites = new HashMap<>();
+    private static boolean writeScheduled;
 
     private static final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private static volatile SharedPreferences prefs;
@@ -271,7 +274,13 @@ final class Lookup {
         }
         Users.put(info.userId, handle);
         String json = info.toJson();
-        if (json != null) prefs.edit().putString(handle, json).apply();
+        if (json != null) {
+            pendingWrites.put(handle, json);
+            if (!writeScheduled) {
+                writeScheduled = true;
+                worker.schedule(Lookup::flushWrites, WRITE_DELAY_MS, TimeUnit.MILLISECONDS);
+            }
+        }
         notifyUpdated(handle);
     }
 
@@ -281,13 +290,26 @@ final class Lookup {
         });
     }
 
+    /** One cache file rewrite for a burst of results instead of one per account. Worker thread. */
+    private static void flushWrites() {
+        writeScheduled = false;
+        if (pendingWrites.isEmpty()) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        for (Map.Entry<String, String> e : pendingWrites.entrySet()) editor.putString(e.getKey(), e.getValue());
+        pendingWrites.clear();
+        editor.apply();
+    }
+
     /** Forgets every cached account; they are looked up again when next shown. */
     static void clear() {
         synchronized (memory) {
             memory.clear();
             attempts.clear();
         }
-        if (prefs != null) prefs.edit().clear().apply();
+        worker.execute(() -> {
+            pendingWrites.clear();
+            if (prefs != null) prefs.edit().clear().apply();
+        });
     }
 
     /** For the details dialog. */

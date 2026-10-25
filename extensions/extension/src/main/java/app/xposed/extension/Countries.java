@@ -8,6 +8,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Country name to flag resolution. The tables are generated from X-Posed's
@@ -26,6 +28,12 @@ final class Countries {
             {"North America", "🌎"}, {"Oceania", "🌏"}, {"South America", "🌎"},
             {"South Asia", "🌏"}, {"Southeast Asia", "🌏"}, {"West Asia", "🌍"},
     };
+
+    private static final Pattern MARKS = Pattern.compile("\\p{M}");
+    private static final Pattern SPACES = Pattern.compile("\\s+");
+    private static final int MEMO_LIMIT = 2000;
+    private static final Map<String, String> CANONICAL = new ConcurrentHashMap<>();
+    private static final Map<String, String> FLAG_MEMO = new ConcurrentHashMap<>();
 
     private static final Map<String, String> FLAGS = new HashMap<>();
     private static final Map<String, String> REGION_FLAGS = new HashMap<>();
@@ -397,18 +405,21 @@ final class Countries {
 
     /** Lookup key: lowercase, accents stripped, typographic apostrophes and spaces normalized. */
     private static String key(String name) {
-        String s = Normalizer.normalize(name.trim(), Normalizer.Form.NFKD)
-                .replaceAll("\\p{M}", "")
-                .replace('‘', '\'').replace('’', '\'').replace('ʼ', '\'')
-                .replaceAll("\\s+", " ");
-        return s.toLowerCase(Locale.ROOT);
+        String s = Normalizer.normalize(name.trim(), Normalizer.Form.NFKD);
+        s = MARKS.matcher(s).replaceAll("")
+                .replace('‘', '\'').replace('’', '\'').replace('ʼ', '\'');
+        return SPACES.matcher(s).replaceAll(" ").toLowerCase(Locale.ROOT);
     }
 
-    /** Key that matches every spelling of a location, for comparing filters. */
+    /** Key that matches every spelling of a location, for comparing filters. Memoized: there are few locations. */
     static String canonicalKey(String location) {
+        String cached = CANONICAL.get(location);
+        if (cached != null) return cached;
         String k = key(location);
         String canonical = ALIASES.get(k);
-        return canonical != null ? canonical : k;
+        String result = canonical != null ? canonical : k;
+        if (CANONICAL.size() < MEMO_LIMIT) CANONICAL.put(location, result);
+        return result;
     }
 
     /** True when the name is one of the English spellings X-Posed knows. */
@@ -422,11 +433,15 @@ final class Countries {
     /** The flag emoji for a location, or null when there is none (regions, unknown names). */
     static String flagFor(String location) {
         if (location == null) return null;
+        String cached = FLAG_MEMO.get(location);
+        if (cached != null) return cached.isEmpty() ? null : cached;
         String k = key(location);
         String canonical = ALIASES.get(k);
         String flag = FLAGS.get(canonical != null ? canonical : k);
         if (flag == null) flag = REGION_FLAGS.get(k);
-        return flag != null ? flag : localized().get(k);
+        if (flag == null) flag = localized().get(k);
+        if (FLAG_MEMO.size() < MEMO_LIMIT) FLAG_MEMO.put(location, flag == null ? "" : flag);
+        return flag;
     }
 
     private static synchronized Map<String, String> localized() {

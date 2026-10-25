@@ -23,6 +23,30 @@ final class Settings {
     static final String MODE_HIDE = "hide";
 
     private static volatile SharedPreferences prefs;
+    private static volatile Badge badge;
+    // Held strongly: SharedPreferences only keeps weak references to listeners.
+    private static final SharedPreferences.OnSharedPreferenceChangeListener invalidate = (p, key) -> badge = null;
+
+    /** Badge settings read together, once per change instead of on every bind. */
+    static final class Badge {
+        final BadgeStyle.Size size;
+        final boolean background, flags, devices, vpn, info;
+
+        private Badge() {
+            size = badgeSize();
+            background = bool(BADGE_BACKGROUND, true);
+            flags = bool(BADGE_FLAGS, true);
+            devices = bool(BADGE_DEVICES, false);
+            vpn = bool(BADGE_VPN, false);
+            info = bool(BADGE_INFO, true);
+        }
+    }
+
+    static Badge badge() {
+        Badge b = badge;
+        if (b == null) badge = b = new Badge();
+        return b;
+    }
 
     private Settings() {
     }
@@ -31,7 +55,10 @@ final class Settings {
         if (prefs != null) return;
         synchronized (Settings.class) {
             if (prefs == null) {
-                prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                SharedPreferences p = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                p.registerOnSharedPreferenceChangeListener(invalidate);
+                prefs = p;
+                badge = null;
             }
         }
     }
@@ -41,29 +68,9 @@ final class Settings {
         return prefs;
     }
 
-    static BadgeStyle.Size badgeSize() {
+    private static BadgeStyle.Size badgeSize() {
         String s = string(BADGE_SIZE, "medium");
         return "small".equals(s) ? BadgeStyle.Size.SMALL : "large".equals(s) ? BadgeStyle.Size.LARGE : BadgeStyle.Size.MEDIUM;
-    }
-
-    static boolean badgeBackground() {
-        return bool(BADGE_BACKGROUND, true);
-    }
-
-    static boolean badgeFlags() {
-        return bool(BADGE_FLAGS, true);
-    }
-
-    static boolean badgeDevices() {
-        return bool(BADGE_DEVICES, false);
-    }
-
-    static boolean badgeVpn() {
-        return bool(BADGE_VPN, false);
-    }
-
-    static boolean badgeInfo() {
-        return bool(BADGE_INFO, true);
     }
 
     static boolean highlightMode() {
@@ -72,7 +79,18 @@ final class Settings {
 
     /** Tint opacity multiplier and rail width in dp for highlighted posts; "standard" is X-Posed's look. */
     static float[] highlightContrast() {
-        switch (string(HIGHLIGHT_CONTRAST, "standard")) {
+        String level = string(HIGHLIGHT_CONTRAST, "standard");
+        if (level.equals(contrastLevel)) return contrast;
+        contrastLevel = level;
+        contrast = contrastFor(level);
+        return contrast;
+    }
+
+    private static volatile String contrastLevel;
+    private static volatile float[] contrast;
+
+    private static float[] contrastFor(String level) {
+        switch (level) {
             case "subtle":
                 return new float[]{0.5f, 2};
             case "strong":

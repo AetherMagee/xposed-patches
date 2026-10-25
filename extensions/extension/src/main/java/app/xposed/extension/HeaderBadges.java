@@ -15,17 +15,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.regex.Pattern;
 
 /** Adds the badge to X's post headers and keeps bound headers in sync with lookups. Main thread only. */
 final class HeaderBadges {
-    private static final Pattern HANDLE = Pattern.compile("[A-Za-z0-9_]{1,15}");
-
     /** The last setData arguments of a header, so it can be re-bound when its account loads. */
     private static final class Binding {
         String name, username, timestamp, handle;
         List<Object> badges;
         BadgeDrawable drawable;
+        /** X's UsernameBadge wrapping drawable, kept while the look stays the same. */
+        Object badge;
         boolean pressed;
     }
 
@@ -61,6 +60,7 @@ final class HeaderBadges {
         binding.timestamp = timestamp;
         binding.handle = handle;
         binding.badges = new ArrayList<>(badges);
+        BadgeDrawable previous = binding.drawable;
         binding.drawable = null;
         binding.pressed = false;
 
@@ -71,12 +71,21 @@ final class HeaderBadges {
         FilterViews.apply(view, Filters.actionFor(info));
         if (info == null || info.isEmpty()) return badges;
 
-        BadgeDrawable drawable = BadgeDrawable.create(view.getContext(), info);
-        if (drawable == null) return badges;
-        Object badge = newUsernameBadge(drawable, describe(info));
-        if (badge == null) return badges;
+        BadgeDrawable drawable;
+        Object badge;
+        if (previous != null && binding.badge != null && previous.looksLike(view.getContext(), info)) {
+            // Recycled rows mostly show accounts that look the same; skip rebuilding.
+            drawable = previous;
+            badge = binding.badge;
+        } else {
+            drawable = BadgeDrawable.create(view.getContext(), info);
+            if (drawable == null) return badges;
+            badge = newUsernameBadge(drawable, describe(info));
+            if (badge == null) return badges;
+        }
 
         binding.drawable = drawable;
+        binding.badge = badge;
         List<Object> result = new ArrayList<>(badges);
         result.add(badge);
         return result;
@@ -85,9 +94,16 @@ final class HeaderBadges {
     /** "@Example" or "Example" from X's username text; null when it isn't a handle. */
     static String normalizeHandle(String username) {
         if (username == null) return null;
-        String s = username.trim();
-        if (s.startsWith("@")) s = s.substring(1);
-        return HANDLE.matcher(s).matches() ? s.toLowerCase(Locale.ROOT) : null;
+        int start = 0, end = username.length();
+        while (start < end && username.charAt(start) <= ' ') start++;
+        while (end > start && username.charAt(end - 1) <= ' ') end--;
+        if (start < end && username.charAt(start) == '@') start++;
+        if (end - start < 1 || end - start > 15) return null;
+        for (int i = start; i < end; i++) {
+            char c = username.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) return null;
+        }
+        return username.substring(start, end).toLowerCase(Locale.ROOT);
     }
 
     private static String describe(AccountInfo info) {

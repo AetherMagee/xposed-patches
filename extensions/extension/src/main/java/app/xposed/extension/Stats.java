@@ -31,7 +31,7 @@ final class Stats {
         }
     }
 
-    private static SharedPreferences prefs;
+    private static volatile SharedPreferences prefs;
     private static final Set<Long> counted = new LinkedHashSet<>();
     private static final Map<String, Integer> seen = new HashMap<>();
     private static final Map<String, Integer> filtered = new HashMap<>();
@@ -51,7 +51,11 @@ final class Stats {
     private Stats() {
     }
 
-    static synchronized void init(Context context) {
+    static void init(Context context) {
+        if (prefs == null) load(context);
+    }
+
+    private static synchronized void load(Context context) {
         if (prefs != null) return;
         prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         readMap(prefs.getString("seen", null), seen);
