@@ -23,6 +23,30 @@ public final class Hooks {
         return null;
     }
 
+    /** Replaced at patch time with "class|idField|usernameField" of TwitterUser. */
+    public static String twitterUserFields() {
+        return null;
+    }
+
+    /** Replaced at patch time with the client event and item field names, see Engagement. */
+    public static String scribeFields() {
+        return null;
+    }
+
+    /** Called at the end of every TwitterUser constructor. */
+    public static void onTwitterUser(Object user) {
+        Users.onTwitterUser(user);
+    }
+
+    /** Called before X dispatches a client event; true drops it. */
+    public static boolean shouldDropEvent(Object event) {
+        try {
+            return Engagement.shouldDrop(event);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     /** Called at the start of TweetHeaderView.setData; returns the badge list to use. */
     public static List<Object> onSetHeaderData(View view, String name, String username, String timestamp, List<Object> badges) {
         try {

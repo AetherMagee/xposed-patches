@@ -16,19 +16,22 @@ final class AccountInfo {
     /** When this data was observed on X, in epoch millis. */
     final long observedAt;
     final String origin;
+    /** X's numeric user id, 0 when unknown. */
+    final long userId;
 
-    AccountInfo(String location, String source, Boolean locationAccurate, String affiliation, long observedAt, String origin) {
+    AccountInfo(String location, String source, Boolean locationAccurate, String affiliation, long observedAt, String origin, long userId) {
         this.location = emptyToNull(location);
         this.source = emptyToNull(source);
         this.locationAccurate = locationAccurate;
         this.affiliation = emptyToNull(affiliation);
         this.observedAt = observedAt;
         this.origin = origin;
+        this.userId = userId;
     }
 
     /** A lookup that found nothing; cached briefly so it isn't retried on every bind. */
     static AccountInfo empty(long now) {
-        return new AccountInfo(null, null, null, null, now, ORIGIN_X);
+        return new AccountInfo(null, null, null, null, now, ORIGIN_X, 0);
     }
 
     boolean isEmpty() {
@@ -48,6 +51,7 @@ final class AccountInfo {
             o.putOpt("af", affiliation);
             o.put("t", observedAt);
             o.put("o", origin);
+            if (userId != 0) o.put("id", userId);
             return o.toString();
         } catch (JSONException e) {
             return null;
@@ -63,7 +67,8 @@ final class AccountInfo {
                     o.has("a") ? o.getBoolean("a") : null,
                     optString(o, "af"),
                     o.getLong("t"),
-                    o.optString("o", ORIGIN_X)
+                    o.optString("o", ORIGIN_X),
+                    o.optLong("id", 0)
             );
         } catch (JSONException | RuntimeException e) {
             return null;

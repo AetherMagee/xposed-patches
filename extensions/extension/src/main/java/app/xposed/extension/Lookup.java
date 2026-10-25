@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -69,15 +70,19 @@ final class Lookup {
     private static int xFailures;
     private static long lastXStart;
 
-    private static volatile Listener listener;
+    private static final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private static volatile SharedPreferences prefs;
     private static volatile boolean diskLoaded;
 
     private Lookup() {
     }
 
-    static void setListener(Listener l) {
-        listener = l;
+    static void addListener(Listener l) {
+        listeners.add(l);
+    }
+
+    static void removeListener(Listener l) {
+        listeners.remove(l);
     }
 
     static void init(Context context) {
@@ -106,6 +111,8 @@ final class Lookup {
     }
 
     private static boolean isStale(AccountInfo info, long now) {
+        // Entries cached before user ids were stored are refreshed once, so engagement filtering can match them.
+        if (!info.isEmpty() && info.userId == 0) return true;
         return now - info.observedAt > (info.isEmpty() ? EMPTY_FRESH_MS : FRESH_MS);
     }
 
@@ -145,6 +152,7 @@ final class Lookup {
                         expired.add(e.getKey());
                     } else if (memory.size() < MEMORY_LIMIT) {
                         memory.put(e.getKey(), info);
+                        Users.put(info.userId, e.getKey());
                     }
                 }
             }
@@ -258,14 +266,25 @@ final class Lookup {
         synchronized (memory) {
             memory.put(handle, info);
         }
+        Users.put(info.userId, handle);
         String json = info.toJson();
         if (json != null) prefs.edit().putString(handle, json).apply();
         notifyUpdated(handle);
     }
 
     private static void notifyUpdated(String handle) {
-        Listener l = listener;
-        if (l != null) main.post(() -> l.onAccountUpdated(handle));
+        main.post(() -> {
+            for (Listener l : listeners) l.onAccountUpdated(handle);
+        });
+    }
+
+    /** Forgets every cached account; they are looked up again when next shown. */
+    static void clear() {
+        synchronized (memory) {
+            memory.clear();
+            attempts.clear();
+        }
+        if (prefs != null) prefs.edit().clear().apply();
     }
 
     /** For the details dialog. */

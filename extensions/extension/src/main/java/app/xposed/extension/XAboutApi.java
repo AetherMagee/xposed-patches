@@ -24,6 +24,7 @@ final class XAboutApi {
     }
 
     private static final String ABOUT_METADATA_CLASS = "com.x.models.profile.ProfileAboutMetadata";
+    private static final String MINIMAL_USER_CLASS = "com.x.models.MinimalUser";
 
     private static volatile Object graphqlApi;
     private static Object repository;
@@ -111,22 +112,35 @@ final class XAboutApi {
             Object success = firstInstanceField(result);
             if (success == null) throw new IllegalStateException("Unexpected result " + result);
             Object about = null;
+            long userId = 0;
             boolean hasAboutField = false;
             for (Field f : success.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
                 if (f.getType().getName().equals(ABOUT_METADATA_CLASS)) {
-                    f.setAccessible(true);
                     about = f.get(success);
                     hasAboutField = true;
+                } else if (f.getType().getName().equals(MINIMAL_USER_CLASS)) {
+                    userId = userId(f.get(success));
                 }
             }
             if (!hasAboutField) throw new IllegalStateException("Unexpected payload " + success);
-            callback.onResult(about == null ? null : toInfo(about), null);
+            callback.onResult(about == null ? null : toInfo(about, userId), null);
         } catch (Throwable t) {
             callback.onResult(null, t);
         }
     }
 
-    private static AccountInfo toInfo(Object about) throws Exception {
+    /** MinimalUser.getId().getUserId(), or 0. */
+    private static long userId(Object minimalUser) {
+        try {
+            Object id = minimalUser.getClass().getMethod("getId").invoke(minimalUser);
+            return (Long) id.getClass().getMethod("getUserId").invoke(id);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static AccountInfo toInfo(Object about, long userId) throws Exception {
         Class<?> c = about.getClass();
         String location = (String) c.getMethod("getBasedInCountry").invoke(about);
         String source = (String) c.getMethod("getAppSource").invoke(about);
@@ -135,7 +149,7 @@ final class XAboutApi {
         Object affiliate = c.getMethod("getAffiliateData").invoke(about);
         if (affiliate != null) affiliation = (String) affiliate.getClass().getMethod("getUsername").invoke(affiliate);
         return new AccountInfo(location, source, location != null ? accurate : null, affiliation,
-                System.currentTimeMillis(), AccountInfo.ORIGIN_X);
+                System.currentTimeMillis(), AccountInfo.ORIGIN_X, userId);
     }
 
     private static Throwable findThrowable(Object o) throws IllegalAccessException {

@@ -46,7 +46,7 @@ final class CloudCache {
 
     /** Hits for the given lowercase handles, or null when the cache is unreachable. */
     static Map<String, AccountInfo> lookup(List<String> handles) {
-        if (System.currentTimeMillis() < cooldownUntil) return null;
+        if (!Settings.communityCache() || System.currentTimeMillis() < cooldownUntil) return null;
         try {
             String users = URLEncoder.encode(String.join(",", handles), "UTF-8");
             JSONObject response = new JSONObject(request("GET", API_URL + "/lookup?users=" + users, null));
@@ -75,7 +75,8 @@ final class CloudCache {
                         entry.optBoolean("a", true),
                         sanitize(AccountInfo.optString(entry, "af")),
                         observedAt,
-                        AccountInfo.ORIGIN_CLOUD
+                        AccountInfo.ORIGIN_CLOUD,
+                        parseId(AccountInfo.optString(entry, "id"))
                 ));
             }
             return hits;
@@ -91,7 +92,7 @@ final class CloudCache {
      * answers in the app language and the cache stores the extension's English names.
      */
     static void contribute(String handle, AccountInfo info) {
-        if (!AccountInfo.ORIGIN_X.equals(info.origin) || info.isEmpty()) return;
+        if (!Settings.communityCache() || !AccountInfo.ORIGIN_X.equals(info.origin) || info.isEmpty()) return;
         if (!"en".equals(Locale.getDefault().getLanguage())) return;
         if (info.location != null && !Countries.isKnownEnglish(info.location)) return;
 
@@ -105,6 +106,7 @@ final class CloudCache {
             entry.putOpt("d", info.source);
             entry.put("a", !Boolean.FALSE.equals(info.locationAccurate));
             entry.putOpt("af", info.affiliation);
+            if (info.userId != 0) entry.put("id", String.valueOf(info.userId));
             contributions.put(handle, entry);
         } catch (Exception e) {
             return;
@@ -161,6 +163,15 @@ final class CloudCache {
             }
         } finally {
             c.disconnect();
+        }
+    }
+
+    private static long parseId(String id) {
+        if (id == null || !id.matches("[0-9]{1,20}")) return 0;
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 

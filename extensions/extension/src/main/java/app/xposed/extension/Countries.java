@@ -1,9 +1,13 @@
 package app.xposed.extension;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Country name to flag resolution. The tables are generated from X-Posed's
@@ -14,7 +18,17 @@ final class Countries {
     /** Shown for locations without a flag, such as X's regional labels. */
     static final String UNKNOWN_FLAG = "🌍";
 
+    /** X's regional labels and X-Posed's globe for each (its REGION_DATA). */
+    private static final String[][] REGIONS = {
+            {"Africa", "🌍"}, {"Asia", "🌏"}, {"Australasia", "🌏"}, {"Caribbean", "🌎"},
+            {"Central Asia", "🌏"}, {"East Asia", "🌏"}, {"East Asia & Pacific", "🌏"},
+            {"Eastern Europe (Non-EU)", "🌍"}, {"Europe", "🌍"}, {"North Africa", "🌍"},
+            {"North America", "🌎"}, {"Oceania", "🌏"}, {"South America", "🌎"},
+            {"South Asia", "🌏"}, {"Southeast Asia", "🌏"}, {"West Asia", "🌍"},
+    };
+
     private static final Map<String, String> FLAGS = new HashMap<>();
+    private static final Map<String, String> REGION_FLAGS = new HashMap<>();
     private static final Map<String, String> ALIASES = new HashMap<>();
     private static Map<String, String> localizedFlags;
 
@@ -347,9 +361,30 @@ final class Countries {
         a("us", "united states");
         a("usa", "united states");
         a("viet nam", "vietnam");
+        for (String[] region : REGIONS) REGION_FLAGS.put(key(region[0]), region[1]);
     }
 
     private Countries() {
+    }
+
+    /** Every country once under its canonical name, then X's regions, for the filter picker. */
+    static List<String> pickerNames() {
+        Set<String> canonical = new TreeSet<>();
+        for (String k : FLAGS.keySet()) canonical.add(ALIASES.containsKey(k) ? ALIASES.get(k) : k);
+        List<String> names = new ArrayList<>();
+        for (String k : canonical) names.add(titleCase(k));
+        for (String[] region : REGIONS) names.add(region[0]);
+        return names;
+    }
+
+    /** Same capitalisation as X-Posed's formatCountryName(). */
+    private static String titleCase(String name) {
+        StringBuilder sb = new StringBuilder(name.length());
+        for (String word : name.split(" ")) {
+            if (sb.length() > 0) sb.append(' ');
+            if (!word.isEmpty()) sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return sb.toString();
     }
 
     private static void f(String name, String flag) {
@@ -390,6 +425,7 @@ final class Countries {
         String k = key(location);
         String canonical = ALIASES.get(k);
         String flag = FLAGS.get(canonical != null ? canonical : k);
+        if (flag == null) flag = REGION_FLAGS.get(k);
         return flag != null ? flag : localized().get(k);
     }
 

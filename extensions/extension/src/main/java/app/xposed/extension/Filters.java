@@ -1,6 +1,5 @@
 package app.xposed.extension;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.util.ArrayList;
@@ -13,60 +12,63 @@ import java.util.Set;
 final class Filters {
     enum Action {NONE, HIDE, HIGHLIGHT}
 
-    private static final String PREFS = "xposed_settings";
-    private static final String KEY_LOCATIONS = "filter_locations";
-    private static final String KEY_HIGHLIGHT = "filter_highlight";
-
-    private static SharedPreferences prefs;
-    /** Display names as X reported them; matched by canonical key. */
+    /** Display names as saved; matched by canonical key. */
     private static Set<String> locations = Collections.emptySet();
     private static Set<String> keys = Collections.emptySet();
-    private static boolean highlightMode;
+    private static boolean loaded;
+    // Held strongly: SharedPreferences only keeps weak references to listeners.
+    private static final SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
+        if (Settings.FILTER_LOCATIONS.equals(key)) reload();
+    };
 
     private Filters() {
     }
 
-    static synchronized void init(Context context) {
-        if (prefs != null) return;
-        prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        highlightMode = prefs.getBoolean(KEY_HIGHLIGHT, true);
-        setLocations(prefs.getStringSet(KEY_LOCATIONS, Collections.emptySet()));
-    }
-
     static synchronized Action actionFor(AccountInfo info) {
-        if (info == null || info.location == null || keys.isEmpty()) return Action.NONE;
-        if (!keys.contains(Countries.canonicalKey(info.location))) return Action.NONE;
-        return highlightMode ? Action.HIGHLIGHT : Action.HIDE;
-    }
-
-    static synchronized boolean isHighlightMode() {
-        return highlightMode;
+        if (info == null || info.location == null) return Action.NONE;
+        load();
+        if (keys.isEmpty() || !keys.contains(Countries.canonicalKey(info.location))) return Action.NONE;
+        return Settings.highlightMode() ? Action.HIGHLIGHT : Action.HIDE;
     }
 
     static synchronized boolean isFiltered(String location) {
+        load();
         return location != null && keys.contains(Countries.canonicalKey(location));
     }
 
     /** Filtered locations, sorted for display. */
     static synchronized List<String> locations() {
+        load();
         List<String> list = new ArrayList<>(locations);
         Collections.sort(list, String.CASE_INSENSITIVE_ORDER);
         return list;
     }
 
     static synchronized void save(Set<String> newLocations, boolean highlight) {
-        setLocations(newLocations);
-        highlightMode = highlight;
+        SharedPreferences prefs = Settings.prefs();
+        if (prefs == null) return;
         prefs.edit()
-                .putStringSet(KEY_LOCATIONS, new HashSet<>(locations))
-                .putBoolean(KEY_HIGHLIGHT, highlight)
+                .putStringSet(Settings.FILTER_LOCATIONS, new HashSet<>(newLocations))
+                .putString(Settings.FILTER_MODE, highlight ? Settings.MODE_HIGHLIGHT : Settings.MODE_HIDE)
                 .apply();
+        reload();
     }
 
-    private static void setLocations(Set<String> newLocations) {
+    private static void load() {
+        if (loaded) return;
+        SharedPreferences prefs = Settings.prefs();
+        if (prefs == null) return;
+        prefs.registerOnSharedPreferenceChangeListener(listener);
+        loaded = true;
+        reload();
+    }
+
+    private static synchronized void reload() {
+        SharedPreferences prefs = Settings.prefs();
+        if (prefs == null) return;
         Set<String> l = new HashSet<>();
         Set<String> k = new HashSet<>();
-        for (String location : newLocations) {
+        for (String location : prefs.getStringSet(Settings.FILTER_LOCATIONS, Collections.emptySet())) {
             // One entry per country, whichever spelling was saved first.
             if (k.add(Countries.canonicalKey(location))) l.add(location);
         }

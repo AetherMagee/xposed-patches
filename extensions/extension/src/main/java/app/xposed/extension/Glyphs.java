@@ -1,9 +1,13 @@
 package app.xposed.extension;
 
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 
 import java.util.Locale;
 
@@ -12,7 +16,7 @@ final class Glyphs {
     private static final float STROKE = 1.8f;
 
     /** One fill or stroke layer of an icon. */
-    private static final class Layer {
+    static final class Layer {
         final Path path;
         final boolean stroke;
         final float strokeWidth;
@@ -29,6 +33,32 @@ final class Glyphs {
 
         Glyph(Layer... layers) {
             this.layers = layers;
+        }
+
+        /** The icon as a drawable filling its bounds, for ImageViews. */
+        Drawable asDrawable(int color) {
+            Glyph glyph = this;
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            return new Drawable() {
+                @Override
+                public void draw(Canvas canvas) {
+                    Rect b = getBounds();
+                    glyph.draw(canvas, paint, b.left, b.top, Math.min(b.width(), b.height()), color);
+                }
+
+                @Override
+                public void setAlpha(int alpha) {
+                }
+
+                @Override
+                public void setColorFilter(ColorFilter colorFilter) {
+                }
+
+                @Override
+                public int getOpacity() {
+                    return PixelFormat.TRANSLUCENT;
+                }
+            };
         }
 
         /** Draws the icon into a size x size box at (left, top). */

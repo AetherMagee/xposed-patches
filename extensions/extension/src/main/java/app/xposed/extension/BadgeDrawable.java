@@ -44,12 +44,12 @@ final class BadgeDrawable extends Drawable {
 
     private static final Map<String, Rect> FLAG_BOUNDS = new HashMap<>();
 
-    private final BadgeStyle.Size size = BadgeStyle.SIZE;
+    private final BadgeStyle.Size size = Settings.badgeSize();
     private final List<Item> items = new ArrayList<>();
     private final String flag;
     private final Glyphs.Glyph deviceGlyph;
-    private final boolean showInfo = BadgeStyle.SHOW_INFO_ICON;
-    private final boolean background = BadgeStyle.SHOW_BACKGROUND;
+    private final boolean showInfo = Settings.badgeInfo();
+    private final boolean background = Settings.badgeBackground();
     private final int fillColor, lineColor, iconColor, alertColor;
     private final float padding, detailsPadding, width;
 
@@ -63,21 +63,21 @@ final class BadgeDrawable extends Drawable {
     private boolean drawn;
 
     private BadgeDrawable(Context context, AccountInfo info) {
-        if (BadgeStyle.SHOW_FLAGS && info.location != null) {
+        if (Settings.badgeFlags() && info.location != null) {
             String f = Countries.flagFor(info.location);
             flag = f != null ? f : Countries.UNKNOWN_FLAG;
             items.add(new Item(Kind.FLAG, size.icon));
         } else {
             flag = null;
         }
-        if (BadgeStyle.SHOW_DEVICES && info.source != null) {
+        if (Settings.badgeDevices() && info.source != null) {
             deviceGlyph = Glyphs.forSource(info.source);
             items.add(new Item(Kind.DEVICE, size.icon));
         } else {
             deviceGlyph = null;
         }
         // Like the extension, the warning belongs to the location and needs a flag.
-        if (BadgeStyle.SHOW_VPN_INDICATOR && flag != null && info.hasLocationWarning()) {
+        if (Settings.badgeVpn() && flag != null && info.hasLocationWarning()) {
             items.add(new Item(Kind.VPN, size.icon - 2));
         }
 

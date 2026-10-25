@@ -1,6 +1,6 @@
 package app.xposed.extension;
 
-/** Badge appearance, mirroring the X-Posed extension's Display settings. */
+/** Badge sizes from the X-Posed extension's Display settings; the toggles live in Settings. */
 final class BadgeStyle {
     enum Size {
         // Height, icon, gap, padding and details padding in CSS px, plus the
@@ -24,13 +24,6 @@ final class BadgeStyle {
             this.spanScale = spanScale;
         }
     }
-
-    static final Size SIZE = Size.MEDIUM;
-    static final boolean SHOW_BACKGROUND = true;
-    static final boolean SHOW_FLAGS = true;
-    static final boolean SHOW_DEVICES = false;
-    static final boolean SHOW_VPN_INDICATOR = false;
-    static final boolean SHOW_INFO_ICON = true;
 
     private BadgeStyle() {
     }

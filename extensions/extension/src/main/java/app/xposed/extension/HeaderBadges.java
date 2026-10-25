@@ -35,7 +35,7 @@ final class HeaderBadges {
     private static boolean reflectionFailed;
 
     static {
-        Lookup.setListener(HeaderBadges::onAccountUpdated);
+        Lookup.addListener(HeaderBadges::onAccountUpdated);
     }
 
     private HeaderBadges() {
@@ -65,7 +65,7 @@ final class HeaderBadges {
         binding.pressed = false;
 
         Lookup.init(view.getContext());
-        Filters.init(view.getContext());
+        Settings.init(view.getContext());
         AccountInfo info = Lookup.get(handle);
         FilterViews.apply(view, Filters.actionFor(info));
         if (info == null || info.isEmpty()) return badges;
@@ -139,7 +139,7 @@ final class HeaderBadges {
                 case MotionEvent.ACTION_UP:
                     if (!b.pressed) return false;
                     b.pressed = false;
-                    if (hit(v, b.drawable, event)) DetailsDialog.show(v.getContext(), b.handle);
+                    if (hit(v, b.drawable, event)) BadgeSheet.show(v.getContext(), b.handle);
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     boolean handled = b.pressed;
