@@ -6,6 +6,10 @@ updates:
     target-branch: dev
     schedule:
       interval: monthly
+    # One pull request per ecosystem and month instead of one per package.
+    groups:
+      all:
+        patterns: ["*"]
 
   - package-ecosystem: npm
     labels: []
@@ -13,6 +17,10 @@ updates:
     target-branch: dev
     schedule:
       interval: monthly
+    # One pull request per ecosystem and month instead of one per package.
+    groups:
+      all:
+        patterns: ["*"]
     ignore:
       # version 10.x and later may not generate release notes correctly
       # https://github.com/conventional-changelog/conventional-changelog/issues/1495
@@ -24,3 +32,7 @@ updates:
     target-branch: dev
     schedule:
       interval: monthly
+    # One pull request per ecosystem and month instead of one per package.
+    groups:
+      all:
+        patterns: ["*"]
