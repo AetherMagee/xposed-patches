@@ -91,6 +91,8 @@ final class SettingsScreen {
         choice("Quoted posts", "What changes when only the quoted account matches.", Settings.QUOTE_SCOPE,
                 new String[]{"Quote only", "Whole post"}, new String[]{Settings.SCOPE_QUOTE, Settings.SCOPE_POST},
                 Settings.SCOPE_QUOTE);
+        toggle("Use device country", "Go by the country in \"Connected via\" instead of where the account is based, "
+                + "for flags and filters. Accounts on the web keep their location.", Settings.DEVICE_COUNTRY, false);
         List<String> filtered = Filters.locations();
         row("Countries and regions", filtered.isEmpty() ? "None" : String.join(", ", filtered), null,
                 v -> new CountryPicker().show());

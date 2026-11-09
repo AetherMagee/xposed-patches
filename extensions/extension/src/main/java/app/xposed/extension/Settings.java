@@ -18,6 +18,7 @@ final class Settings {
     static final String ZERO_ENGAGEMENT = "zero_engagement";
     static final String COMMUNITY_CACHE = "community_cache";
     static final String HIGHLIGHT_CONTRAST = "highlight_contrast";
+    static final String DEVICE_COUNTRY = "device_country";
     static final String QUOTE_SCOPE = "quote_scope";
 
     static final String MODE_HIGHLIGHT = "highlight";
@@ -27,8 +28,12 @@ final class Settings {
 
     private static volatile SharedPreferences prefs;
     private static volatile Badge badge;
+    private static volatile Boolean deviceCountry;
     // Held strongly: SharedPreferences only keeps weak references to listeners.
-    private static final SharedPreferences.OnSharedPreferenceChangeListener invalidate = (p, key) -> badge = null;
+    private static final SharedPreferences.OnSharedPreferenceChangeListener invalidate = (p, key) -> {
+        badge = null;
+        deviceCountry = null;
+    };
 
     /** Badge settings read together, once per change instead of on every bind. */
     static final class Badge {
@@ -62,6 +67,7 @@ final class Settings {
                 p.registerOnSharedPreferenceChangeListener(invalidate);
                 prefs = p;
                 badge = null;
+                deviceCountry = null;
             }
         }
     }
@@ -103,6 +109,13 @@ final class Settings {
             default:
                 return new float[]{1, 2};
         }
+    }
+
+    /** Read for every account shown, so cached until the next settings change. */
+    static boolean deviceCountry() {
+        Boolean d = deviceCountry;
+        if (d == null) deviceCountry = d = bool(DEVICE_COUNTRY, false);
+        return d;
     }
 
     /** True when a filtered quoted account affects the whole post rather than just its quote card. */

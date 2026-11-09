@@ -21,7 +21,8 @@ Then patch X 12.19.1-release.0 (the APKM from APKMirror). Works on its own and a
   source, location accuracy, affiliation) and highlight or hide posts from that country.
 - **Country filters**: highlight (default) or hide posts from chosen countries or X regions.
   A filtered quoted account affects only its quote card (a hidden one can be tapped to show
-  it) or, if you choose, the whole post.
+  it) or, if you choose, the whole post. Filters and flags can go by the country in
+  "Connected via" instead of the account location.
 - **No passive engagement**: impressions, viewing time, video views and opening of filtered
   posts aren't reported to X. Likes, replies and reposts still are.
 - **Settings and statistics**: badge style with a live preview, filters, highlight contrast,
