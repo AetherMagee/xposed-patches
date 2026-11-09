@@ -18,9 +18,12 @@ final class Settings {
     static final String ZERO_ENGAGEMENT = "zero_engagement";
     static final String COMMUNITY_CACHE = "community_cache";
     static final String HIGHLIGHT_CONTRAST = "highlight_contrast";
+    static final String QUOTE_SCOPE = "quote_scope";
 
     static final String MODE_HIGHLIGHT = "highlight";
     static final String MODE_HIDE = "hide";
+    static final String SCOPE_QUOTE = "quote";
+    static final String SCOPE_POST = "post";
 
     private static volatile SharedPreferences prefs;
     private static volatile Badge badge;
@@ -100,6 +103,11 @@ final class Settings {
             default:
                 return new float[]{1, 2};
         }
+    }
+
+    /** True when a filtered quoted account affects the whole post rather than just its quote card. */
+    static boolean quoteAffectsPost() {
+        return SCOPE_POST.equals(string(QUOTE_SCOPE, SCOPE_QUOTE));
     }
 
     static boolean zeroEngagement() {
